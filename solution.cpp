@@ -14,11 +14,14 @@ void *producerFunction(void *_arg) {
   // The producer that was last active should ensure that all the consumers have
   // finished. NOTE: Each thread will enqueue `n` items.
   // Use mutex variables and conditional variables as necessary.
+  int errorPrint;
   for(int i = 0; i < 10; i++){
     //pthread_mutex_lock();
-    pthread_mutex_lock(inputArguments->queueLock);
+    errorPrint = pthread_mutex_lock(inputArguments->queueLock);
+    //std::cout << "ErrorPrint = " << errorPrint << std::endl;
     std::cout << " I am producer thread " << pthread_self() << " I will attempt to store " << i << std::endl;
     pthread_mutex_unlock(inputArguments->queueLock);
+    //std::cout << "ErrorPrint = " << errorPrint << std::endl;
     sleep(rand()%3 + 1);
   }
   return 0;
@@ -53,6 +56,7 @@ ProducerConsumerProblem::ProducerConsumerProblem(long _n_items,
   consumer_threads = new pthread_t[n_consumers];
   // Initialize all mutex and conditional variables here.
   producerArguments.queueLock = new pthread_mutex_t;
+  pthread_mutex_init(producerArguments.queueLock,NULL);
 }
 
 ProducerConsumerProblem::~ProducerConsumerProblem() {
