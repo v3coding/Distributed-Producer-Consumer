@@ -3,15 +3,36 @@
 #include <pthread.h>
 #include <stdlib.h>
 
+typedef struct threadStats{
+  pthread_t threadID;
+  long numberItems;
+  long valueItems;
+  double runtime;
+} threadStats;
+
 typedef struct argumentStructure{
-    pthread_mutex_t *queueLock;
+  pthread_mutex_t *queueLock;
+  long numberOfItems;
+  CircularQueue* queue;
+  long valueProduced;
+  long valueConsumed;
+  long numberConsumed;
+  long numberProduced;
+  int totalProducers;
+  int totalConsumers;
+  int activeConsumerCount;
+  int activeProducerCount;
+  bool* consuming;
+  threadStats* threadStatsProducers;
+  threadStats* threadStatsConsumers;
 } argumentStructure;
 
 class ProducerConsumerProblem {
-  argumentStructure producerArguments;
+  argumentStructure threadArguments;
   long n_items;
   int n_producers;
   int n_consumers;
+  bool consuming;
   CircularQueue production_buffer;
 
   // Dynamic array of thread identifiers for producer and consumer threads.

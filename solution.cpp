@@ -1,8 +1,11 @@
 #include "solution.h"
 
 //REMOVE
-#include <iostream>
-#include <unistd.h>
+//#include <iostream>
+//#include <unistd.h>
+//REMOVE
+
+//I was verifying that all of the items were enqueued correctly but I need to fix joining and tracking threads first
 
 void *producerFunction(void *_arg) {
   argumentStructure* inputArguments = (argumentStructure*) _arg;
@@ -14,20 +17,48 @@ void *producerFunction(void *_arg) {
   // The producer that was last active should ensure that all the consumers have
   // finished. NOTE: Each thread will enqueue `n` items.
   // Use mutex variables and conditional variables as necessary.
+  timer t1;
+  t1.start();
   int errorPrint;
-  for(int i = 0; i < 10; i++){
-    //pthread_mutex_lock();
+  long item = 0;
+  long items_produced = 0;
+  long value_produced = 0;
+  while(items_produced < inputArguments->numberOfItems){
+  //for(int i = 0; i < inputArguments->numberOfItems; i++){
     errorPrint = pthread_mutex_lock(inputArguments->queueLock);
-    //std::cout << "ErrorPrint = " << errorPrint << std::endl;
-    std::cout << " I am producer thread " << pthread_self() << " I will attempt to store " << i << std::endl;
+    //std::cout << " I am producer thread " << pthread_self() << " Item = " << item << " Total items = " << value_produced << std::endl;
+    bool enqueued = inputArguments->queue->enqueue(item);
+    if(!enqueued){
+      //std::cout << "enqueue failed" << std::endl;
+    }
+    else{
+      //std::cout << item << " enqueued" << std::endl;
+      value_produced += item;
+      items_produced++;
+      item++;
+    }
     pthread_mutex_unlock(inputArguments->queueLock);
-    //std::cout << "ErrorPrint = " << errorPrint << std::endl;
-    sleep(rand()%3 + 1);
   }
+  pthread_mutex_lock(inputArguments->queueLock);
+  inputArguments->valueProduced += value_produced;
+  inputArguments->numberProduced += items_produced;
+  inputArguments->activeProducerCount--;
+  for(int i = 0; i < inputArguments->totalProducers; i++){
+    if(pthread_self() == inputArguments->threadStatsProducers->threadID){
+      inputArguments->threadStatsProducers->runtime = t1.stop();
+      inputArguments->threadStatsProducers->numberItems = items_produced;
+      inputArguments->threadStatsProducers->valueItems = value_produced;
+      //std::cout << "STORED METRICS PRODUCERS : UID = " << inputArguments->threadStatsProducers->threadID << " ITEMS PRODUCED " << inputArguments->threadStatsProducers->numberItems
+      //<< " VALUE PRODUCED " << inputArguments->threadStatsProducers->valueItems << " TIME " << inputArguments->threadStatsProducers->runtime << std::endl;
+    }
+  }
+  pthread_mutex_unlock(inputArguments->queueLock);
+  //std::cout << "LINE 40 Active Producer Count " << inputArguments->activeProducerCount << std::endl; 
   return 0;
 }
 
 void *consumerFunction(void *_arg) {
+  argumentStructure* inputArguments = (argumentStructure*) _arg;
   // Parse the _arg passed to the function.
   // The consumer thread will consume items by dequeueing the items from the
   // `production_buffer`.
@@ -37,6 +68,41 @@ void *consumerFunction(void *_arg) {
   // will exit. NOTE: The number of items consumed by each thread need not be
   // same.
   // Use mutex variables and conditional variables as necessary.
+  timer t1;
+  t1.start();
+  int errorPrint;
+  long item;
+  long items_consumed = 0;
+  long value_consumed = 0; 
+
+  while(inputArguments->consuming){
+    pthread_mutex_lock(inputArguments->queueLock);
+    bool ret = inputArguments->queue->dequeue(&item);
+    if(ret){
+      items_consumed++;
+      value_consumed += item;
+      //std::cout << "Number " << item << " was sucessfully Dequeued" << std::endl;
+    }
+    pthread_mutex_unlock(inputArguments->queueLock);
+    if(inputArguments->activeProducerCount == 0 && inputArguments->queue->isEmpty()){
+      inputArguments->consuming = 0;
+    }
+  }
+    pthread_mutex_lock(inputArguments->queueLock);
+    inputArguments->valueConsumed += value_consumed;
+    inputArguments->numberConsumed += items_consumed;
+    
+
+    for(int i = 0; i < inputArguments->totalConsumers; i++){
+    if(pthread_self() == inputArguments->threadStatsConsumers->threadID){
+      inputArguments->threadStatsConsumers->runtime = t1.stop();
+      inputArguments->threadStatsConsumers->numberItems = items_consumed;
+      inputArguments->threadStatsConsumers->valueItems = value_consumed;
+      //std::cout << "STORED METRICS CONSUMERS : UID = " << inputArguments->threadStatsConsumers->threadID << " ITEMS CONSUMED " << inputArguments->threadStatsConsumers->numberItems
+      //<< " VALUE CONSUMED " << inputArguments->threadStatsConsumers->valueItems << " TIME " << inputArguments->threadStatsConsumers->runtime << std::endl;
+    }
+  }
+  pthread_mutex_unlock(inputArguments->queueLock);
   return 0;
 }
 
@@ -55,44 +121,77 @@ ProducerConsumerProblem::ProducerConsumerProblem(long _n_items,
   producer_threads = new pthread_t[n_producers];
   consumer_threads = new pthread_t[n_consumers];
   // Initialize all mutex and conditional variables here.
-  producerArguments.queueLock = new pthread_mutex_t;
-  pthread_mutex_init(producerArguments.queueLock,NULL);
+  threadArguments.threadStatsProducers = new threadStats[n_producers];
+  threadArguments.threadStatsConsumers = new threadStats[n_consumers];
+  threadArguments.queueLock = new pthread_mutex_t;
+  threadArguments.numberOfItems = n_items;
+  threadArguments.queue = &production_buffer;
+  pthread_mutex_init(threadArguments.queueLock,NULL);
+  threadArguments.consuming = &consuming;
+  threadArguments.numberConsumed = 0;
+  threadArguments.numberProduced = 0;
+  threadArguments.valueConsumed = 0;
+  threadArguments.valueProduced = 0;
+  threadArguments.totalProducers = n_producers;
+  threadArguments.totalConsumers = n_consumers;
 }
 
 ProducerConsumerProblem::~ProducerConsumerProblem() {
-  std::cout << "Destructor\n";
+  //std::cout << "Destructor\n";
   delete[] producer_threads;
   delete[] consumer_threads;
+  delete[] threadArguments.queueLock;
   // Destroy all mutex and conditional variables here.
 }
 
 void ProducerConsumerProblem::startProducers() {
-  std::cout << "Starting Producers\n";
-  n_producers = 2;
+  //std::cout << "Starting Producers\n";
   active_producer_count = n_producers;
-  
-  pthread_t* thread = new pthread_t;
-
+  threadArguments.activeProducerCount = n_producers;
+  consuming = 1;
   for(int i = 0; i < n_producers; i++){
-    std::cout << "producer spawned : " << i << std::endl;
-    pthread_create(thread,NULL,producerFunction,&producerArguments);
+    pthread_create(&producer_threads[i],NULL,producerFunction,&threadArguments);
+    threadArguments.threadStatsProducers->threadID = producer_threads[i];
+    //std::cout << "Thread Spawned : " << threadArguments.threadStatsProducers->threadID << std::endl;
   }
-  // Create producer threads P1, P2, P3,.. using pthread_create.
 }
 
 void ProducerConsumerProblem::startConsumers() {
-  std::cout << "Starting Consumers\n";
+  //std::cout << "Starting Consumers\n";
   active_consumer_count = n_consumers;
+
+  //pthread_t* thread = new pthread_t;
+
+  for(int i = 0; i < n_consumers; i++){
+    pthread_create(&consumer_threads[i],NULL,consumerFunction,&threadArguments);
+    threadArguments.threadStatsConsumers->threadID = consumer_threads[i];
+        //std::cout << "consumer spawned : " << i << " with UID " << consumer_threads[i] << std::endl;
+  }
+
   // Create consumer threads C1, C2, C3,.. using pthread_create.
 }
 
 void ProducerConsumerProblem::joinProducers() {
-  std::cout << "Joining Producers\n";
+  //std::cout << "Joining Producers\n";
+  for(int i = 0; i < n_producers; i++){
+    pthread_join(producer_threads[i],NULL);
+    //std::cout << "Producer " << producer_threads[i] << " Joined! " << std::endl;
+   }
+  //std::cout << "Number of Items Produced = " << threadArguments.numberProduced << " Total Value of Items Produced = " << threadArguments.valueProduced << std::endl;
+  //std::cout << "Final Active Producer Count = " << threadArguments.activeProducerCount << std::endl;
+
+
+
   // Join the producer threads with the main thread using pthread_join
 }
 
 void ProducerConsumerProblem::joinConsumers() {
-  std::cout << "Joining Consumers\n";
+  //std::cout << "Joining Consumers\n";
+    for(int i = 0; i < n_consumers; i++){
+    pthread_join(consumer_threads[i],NULL);
+    //std::cout << "Consumer " << consumer_threads[i] << " Joined! " << std::endl;
+   }
+   //std::cout << "Number of Items Consumed = " << threadArguments.numberConsumed << " Total Value of Items Consumed = " << threadArguments.valueConsumed << std::endl;
   // Join the consumer threads with the main thread using pthread_join
 }
 
@@ -106,10 +205,12 @@ void ProducerConsumerProblem::printStats() {
   long total_produced = 0;
   long total_value_produced = 0;
   for (int i = 0; i < n_producers; i++) {
-    // ---
-    //
-    // ---
+    std::cout << i << ", " << threadArguments.threadStatsProducers->numberItems << ", " << threadArguments.threadStatsProducers->valueItems << ", "
+    << threadArguments.threadStatsProducers->runtime << std::endl;
   }
+  total_value_produced = threadArguments.valueProduced;
+  total_produced = threadArguments.numberProduced;
+
   std::cout << "Total produced = " << total_produced << "\n";
   std::cout << "Total value produced = " << total_value_produced << "\n";
   std::cout << "Consumer stats\n";
@@ -122,10 +223,12 @@ void ProducerConsumerProblem::printStats() {
   long total_consumed = 0;
   long total_value_consumed = 0;
   for (int i = 0; i < n_consumers; i++) {
-    // ---
-    //
-    // ---
+    std::cout << i << ", " << threadArguments.threadStatsConsumers->numberItems << ", " << threadArguments.threadStatsConsumers->valueItems << ", "
+    << threadArguments.threadStatsConsumers->runtime << std::endl;
   }
+  total_value_consumed = threadArguments.valueConsumed;
+  total_consumed = threadArguments.valueConsumed;
+
   std::cout << "Total consumed = " << total_consumed << "\n";
   std::cout << "Total value consumed = " << total_value_consumed << "\n";
 }
