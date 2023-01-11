@@ -43,11 +43,13 @@ void *producerFunction(void *_arg) {
   inputArguments->valueProduced += value_produced;
   inputArguments->numberProduced += items_produced;
   inputArguments->activeProducerCount--;
+  //std::cout << "Closing Statistics : pthread_t = " << pthread_self() << " statistic UID = " << inputArguments->threadStatsProducers[i].threadID << std::endl;
   for(int i = 0; i < inputArguments->totalProducers; i++){
-    if(pthread_self() == inputArguments->threadStatsProducers->threadID){
-      inputArguments->threadStatsProducers->runtime = t1.stop();
-      inputArguments->threadStatsProducers->numberItems = items_produced;
-      inputArguments->threadStatsProducers->valueItems = value_produced;
+    if(pthread_self() == inputArguments->threadStatsProducers[i].threadID){
+      //std::cout << "PRODUCER MATCH FOUND THREAD STATS ! " << pthread_self() << " matches with " << inputArguments->threadStatsProducers[i].threadID << std::endl;
+      inputArguments->threadStatsProducers[i].runtime = t1.stop();
+      inputArguments->threadStatsProducers[i].numberItems = items_produced;
+      inputArguments->threadStatsProducers[i].valueItems = value_produced;
       //std::cout << "STORED METRICS PRODUCERS : UID = " << inputArguments->threadStatsProducers->threadID << " ITEMS PRODUCED " << inputArguments->threadStatsProducers->numberItems
       //<< " VALUE PRODUCED " << inputArguments->threadStatsProducers->valueItems << " TIME " << inputArguments->threadStatsProducers->runtime << std::endl;
     }
@@ -94,10 +96,11 @@ void *consumerFunction(void *_arg) {
     
 
     for(int i = 0; i < inputArguments->totalConsumers; i++){
-    if(pthread_self() == inputArguments->threadStatsConsumers->threadID){
-      inputArguments->threadStatsConsumers->runtime = t1.stop();
-      inputArguments->threadStatsConsumers->numberItems = items_consumed;
-      inputArguments->threadStatsConsumers->valueItems = value_consumed;
+    if(pthread_self() == inputArguments->threadStatsConsumers[i].threadID){
+      //std::cout << "CONSUMER MATCH FOUND THREAD STATS ! " << pthread_self() << " matches with " << inputArguments->threadStatsConsumers->threadID << std::endl;
+      inputArguments->threadStatsConsumers[i].runtime = t1.stop();
+      inputArguments->threadStatsConsumers[i].numberItems = items_consumed;
+      inputArguments->threadStatsConsumers[i].valueItems = value_consumed;
       //std::cout << "STORED METRICS CONSUMERS : UID = " << inputArguments->threadStatsConsumers->threadID << " ITEMS CONSUMED " << inputArguments->threadStatsConsumers->numberItems
       //<< " VALUE CONSUMED " << inputArguments->threadStatsConsumers->valueItems << " TIME " << inputArguments->threadStatsConsumers->runtime << std::endl;
     }
@@ -151,8 +154,8 @@ void ProducerConsumerProblem::startProducers() {
   consuming = 1;
   for(int i = 0; i < n_producers; i++){
     pthread_create(&producer_threads[i],NULL,producerFunction,&threadArguments);
-    threadArguments.threadStatsProducers->threadID = producer_threads[i];
-    //std::cout << "Thread Spawned : " << threadArguments.threadStatsProducers->threadID << std::endl;
+    threadArguments.threadStatsProducers[i].threadID = producer_threads[i];
+    //std::cout << "Producer Spawned : " << i << " with UID " << producer_threads[i] << " and Statistic UID " << threadArguments.threadStatsProducers[i].threadID << std::endl;
   }
 }
 
@@ -164,8 +167,8 @@ void ProducerConsumerProblem::startConsumers() {
 
   for(int i = 0; i < n_consumers; i++){
     pthread_create(&consumer_threads[i],NULL,consumerFunction,&threadArguments);
-    threadArguments.threadStatsConsumers->threadID = consumer_threads[i];
-        //std::cout << "consumer spawned : " << i << " with UID " << consumer_threads[i] << std::endl;
+    threadArguments.threadStatsConsumers[i].threadID = consumer_threads[i];
+    //std::cout << "Consumer spawned : " << i << " with UID " << consumer_threads[i] << " and Statistic UID " << threadArguments.threadStatsConsumers[i].threadID << std::endl;
   }
 
   // Create consumer threads C1, C2, C3,.. using pthread_create.
@@ -205,8 +208,8 @@ void ProducerConsumerProblem::printStats() {
   long total_produced = 0;
   long total_value_produced = 0;
   for (int i = 0; i < n_producers; i++) {
-    std::cout << i << ", " << threadArguments.threadStatsProducers->numberItems << ", " << threadArguments.threadStatsProducers->valueItems << ", "
-    << threadArguments.threadStatsProducers->runtime << std::endl;
+    std::cout << i << ", " << threadArguments.threadStatsProducers[i].numberItems << ", " << threadArguments.threadStatsProducers[i].valueItems << ", "
+    << threadArguments.threadStatsProducers[i].runtime << std::endl;
   }
   total_value_produced = threadArguments.valueProduced;
   total_produced = threadArguments.numberProduced;
@@ -223,8 +226,8 @@ void ProducerConsumerProblem::printStats() {
   long total_consumed = 0;
   long total_value_consumed = 0;
   for (int i = 0; i < n_consumers; i++) {
-    std::cout << i << ", " << threadArguments.threadStatsConsumers->numberItems << ", " << threadArguments.threadStatsConsumers->valueItems << ", "
-    << threadArguments.threadStatsConsumers->runtime << std::endl;
+    std::cout << i << ", " << threadArguments.threadStatsConsumers[i].numberItems << ", " << threadArguments.threadStatsConsumers[i].valueItems << ", "
+    << threadArguments.threadStatsConsumers[i].runtime << std::endl;
   }
   total_value_consumed = threadArguments.valueConsumed;
   total_consumed = threadArguments.valueConsumed;
