@@ -1,0 +1,7 @@
+Producer Consumer Implementation as a Demonstration in C++ Object Oriented Programming 
+
+Written entirely by Me
+
+Will produce and consume a set number of "items" in a distributed fashion 
+
+Uses mutexes for synchronization 
